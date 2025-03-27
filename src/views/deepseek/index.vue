@@ -1,5 +1,6 @@
 <script setup>
 import { Promotion, Delete, EditPen, Brush } from '@element-plus/icons-vue'
+import MessageComp from './components/messageComp.vue';
 </script>
 <template>
   <div class="inner-html-container">
@@ -44,7 +45,9 @@ import { Promotion, Delete, EditPen, Brush } from '@element-plus/icons-vue'
           </div>
         </div>
         <div class="container">
-          <div class="message-area"></div>
+          <div class="message-area">
+            <MessageComp />
+          </div>
           <div class="user-tokens">
             <span>当前余额为：￥0</span>
           </div>
