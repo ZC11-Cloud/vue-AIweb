@@ -10,8 +10,9 @@ const props = defineProps({
 
 const scrollBottom = () => {
   nextTick(() => {
-    const div = document.querySelectorById('messageCompBox')
+    const div = document.getElementById('messageCompBox')
     div.scrollTop = div.scrollHeight - div.clientHeight
+    console.log('scrollBottom方法调用了')
   })
 }
 

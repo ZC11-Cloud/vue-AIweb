@@ -13,10 +13,15 @@ const queryInfos = ref({
   model: "deepseek-chat",
   ...MODEL_CONFIG,
 })
+
+// openai实例
 const openai = ref(null)
 
 // 当前的模型配置
 const currentConfig = ref(DeepSeek_CONFIG)
+
+// 对话组件实例
+const messageRef = ref(null)
 
 const initOpenAI = () => {
   openai.value = new OpenAI({
@@ -35,7 +40,8 @@ const handleRequest = async () => {
     name: "asa"
   })
 
-  queryKeys.value = ''
+  queryKeys.value = null
+  messageRef.value.scrollBottom()
 
   try {
     queryInfos.value.messages.push({
@@ -104,7 +110,7 @@ const handleRequest = async () => {
         </div>
         <div class="container">
           <div class="message-area">
-            <MessageComp :messages="queryInfos.messages" />
+            <MessageComp :messages="queryInfos.messages" ref="messageRef" />
           </div>
           <div class="user-tokens">
             <span>当前余额为：￥0</span>
