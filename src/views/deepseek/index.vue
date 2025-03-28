@@ -1,6 +1,65 @@
 <script setup>
 import { Promotion, Delete, EditPen, Brush } from '@element-plus/icons-vue'
 import MessageComp from './components/messageComp.vue';
+import {ref} from 'vue'
+import OpenAI from 'openai'
+import { API_CONFIG as DeepSeek_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/config/deepseek'
+// 用户输入的提示词
+const queryKeys = ref('')
+
+//
+const queryInfos = ref({
+  messages: [],
+  model: "deepseek-chat",
+  ...MODEL_CONFIG,
+})
+const openai = ref(null)
+
+// 当前的模型配置
+const currentConfig = ref(DeepSeek_CONFIG)
+
+const initOpenAI = () => {
+  openai.value = new OpenAI({
+    ...currentConfig.value,
+  })
+}
+// 处理用户请求
+const handleRequest = async () => {
+  console.log("用户正在发起请求")
+  if (!queryKeys.value) return; // 输入为空时，不执行
+  if (!openai.value) initOpenAI() // 初始化openai
+
+  queryInfos.value.messages.push({
+    role: "user",
+    content: queryKeys.value,
+    name: "asa"
+  })
+
+  queryKeys.value = ''
+
+  try {
+    queryInfos.value.messages.push({
+      role: "assistant",
+      content: "",
+    })
+    if (queryInfos.value.model === "deepseek-chat") {
+      const requestConfig = {
+        ...queryInfos.value,
+        stream: true,
+      }
+
+      const response = await openai.value.chat.completions.create(requestConfig);
+
+      for await (const part of response) {
+        queryInfos.value.messages[queryInfos.value.messages.length - 1].content += part.choices[0].delta.content;
+        console.log(part.choices[0].delta.content)
+      }
+    }
+  } catch(error) {
+    queryInfos.value.messages[queryInfos.value.messages.length - 1].content = error.message
+  }
+
+}
 </script>
 <template>
   <div class="inner-html-container">
@@ -52,12 +111,13 @@ import MessageComp from './components/messageComp.vue';
             <span>当前余额为：￥0</span>
           </div>
           <div class="input-area">
-            <el-input placeholder="请输入内容" show-word-limit />
+            <el-input placeholder="请输入内容" show-word-limit v-model="queryKeys" />
             <el-select class="model-select">
               <el-option label="DeepSeek" value="deepseek-chat" />
               <el-option label="Gemini" value="gemini-chat" />
             </el-select>
-            <el-button style="height: 40px" type="primary">
+            <el-button style="height: 40px" type="primary"
+            @click="handleRequest">
               <el-icon>
                 <Promotion />
               </el-icon>
