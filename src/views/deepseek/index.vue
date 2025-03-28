@@ -1,7 +1,7 @@
 <script setup>
-import { Promotion, Delete, EditPen, Brush } from '@element-plus/icons-vue'
-import MessageComp from './components/messageComp.vue';
-import {ref} from 'vue'
+import { Promotion, Delete, EditPen, Brush, Plus } from '@element-plus/icons-vue'
+import MessageComp from './components/messageComp.vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import OpenAI from 'openai'
 import { API_CONFIG as DeepSeek_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/config/deepseek'
 // 用户输入的提示词
@@ -10,7 +10,7 @@ const queryKeys = ref('')
 // 请求信息
 const queryInfos = ref({
   messages: [],
-  model: "deepseek-chat",
+  model: 'deepseek-chat',
   ...MODEL_CONFIG,
 })
 
@@ -23,21 +23,96 @@ const currentConfig = ref(DeepSeek_CONFIG)
 // 对话组件实例
 const messageRef = ref(null)
 
+// 对话列表
+const sessionList = ref([])
+
+// 当前活跃的对话索引
+const activeIndex = ref(-1)
+
+// 监听对话列表的变化
+watch(
+  sessionList,
+  (val) => {
+    const list = val.map((item, index) => ({
+      ...item,
+      messages: index === activeIndex.value ? queryInfos.value.messages : item.messages,
+    }))
+    localStorage.setItem(STORAGE_KEYS.sessionList, JSON.stringify(list))
+  },
+  { deep: true },
+)
+
+// 监听活跃索引
+watch(
+  activeIndex,
+  (val) => {
+    console.log('活跃索引变化', val, STORAGE_KEYS.activeIndex)
+    localStorage.setItem(STORAGE_KEYS.activeIndex, JSON.stringify(val))
+  },
+  { deep: true },
+)
+// 初始化openai实例
 const initOpenAI = () => {
   openai.value = new OpenAI({
     ...currentConfig.value,
   })
 }
+
+// 初始化对话列表
+const initSessionList = () => {
+  sessionList.value = JSON.parse(localStorage.getItem(STORAGE_KEYS.sessionList) || '[]')
+}
+
+// 初始化活跃索引
+const initIndex = () => {
+  // 获取缓存的对话列表长度
+  const listLen = JSON.parse(localStorage.getItem(STORAGE_KEYS.sessionList) || '[]').length
+
+  // 获取活跃的对话索引，如果不存在默认为-1
+  const lastIndex = JSON.parse(localStorage.getItem(STORAGE_KEYS.activeIndex) || '-1')
+
+  if (listLen) {
+    activeIndex.value = lastIndex || 0
+  } else {
+    activeIndex.value = -1
+  }
+
+  if (activeIndex.value !== -1) {
+    queryInfos.value.messages = sessionList.value[activeIndex.value].messages || []
+  }
+}
+
+// 新增对话
+const handleAddSession = () => {
+  sessionList.value.push({
+    title: `对话${sessionList.value.length + 1}`,
+    crtTime: new Date(),
+    messages: [],
+  })
+  queryInfos.value.messages = []
+  activeIndex.value = sessionList.value.length - 1
+}
+
+// 改变活跃对话
+const handleChangeSessionIndex = async (index) => {
+  activeIndex.value = index
+  queryInfos.value.messages = sessionList.value[index]?.messages || []
+  await nextTick()
+  messageRef.value.scrollBottom()
+}
+
 // 处理用户请求
 const handleRequest = async () => {
-  console.log("用户正在发起请求")
-  if (!queryKeys.value) return; // 输入为空时，不执行
+  console.log('用户正在发起请求')
+  if (!queryKeys.value) return // 输入为空时，不执行
   if (!openai.value) initOpenAI() // 初始化openai
-
+  if (!sessionList.value.length) {
+    handleAddSession()
+  }
   queryInfos.value.messages.push({
-    role: "user",
+    role: 'user',
     content: queryKeys.value,
-    name: "asa"
+    name: 'asa',
   })
 
   queryKeys.value = null
@@ -45,26 +120,36 @@ const handleRequest = async () => {
 
   try {
     queryInfos.value.messages.push({
-      role: "assistant",
-      content: "",
+      role: 'assistant',
+      content: '',
     })
-    if (queryInfos.value.model === "deepseek-chat") {
+    if (queryInfos.value.model === 'deepseek-chat') {
       const requestConfig = {
         ...queryInfos.value,
         stream: true,
       }
 
-      const response = await openai.value.chat.completions.create(requestConfig);
+      const response = await openai.value.chat.completions.create(requestConfig)
 
       for await (const part of response) {
-        queryInfos.value.messages[queryInfos.value.messages.length - 1].content += part.choices[0].delta.content;
+        queryInfos.value.messages[queryInfos.value.messages.length - 1].content +=
+          part.choices[0].delta.content
       }
+
+      messageRef.value.scrollBottom()
     }
-  } catch(error) {
+  } catch (error) {
     queryInfos.value.messages[queryInfos.value.messages.length - 1].content = error.message
   }
-
 }
+
+onMounted(async () => {
+  initSessionList()
+  initIndex()
+  initOpenAI()
+  await nextTick()
+  messageRef.value.scrollBottom()
+})
 </script>
 <template>
   <div class="inner-html-container">
@@ -77,23 +162,28 @@ const handleRequest = async () => {
       </div>
       <div class="grid-space-between grid-box">
         <div class="left-container">
+          <el-button
+            type="primary"
+            class="add-btn"
+            :icon="Plus"
+            size="large"
+            @click="handleAddSession"
+          >
+            新建对话
+          </el-button>
           <div class="session-area">
-            <div class="session-item">
-              <span class="active-node">对话1</span>
-              <div class="icon-box">
-                <el-icon class="icon" color="#fff" @click.stop="handleClearSession(index)">
-                  <Brush />
-                </el-icon>
-                <el-icon class="icon" color="#fff" @click.stop="handleFocusInput(index)">
-                  <EditPen />
-                </el-icon>
-                <el-icon class="icon" color="#fff" @click.stop="handleDeleteSession(index)">
-                  <Delete />
-                </el-icon>
-              </div>
-            </div>
-            <div class="session-item">
-              <span class="normal-node">对话2</span>
+            <div
+              class="session-item"
+              :class="activeIndex == index ? 'session-item-active' : ''"
+              v-for="(item, index) in sessionList"
+              :key="index"
+              @click="handleChangeSessionIndex(index)"
+            >
+              <span
+                class="normal-node"
+                :class="activeIndex == index ? 'active-node' : 'normal-node'"
+                >{{ item.title }}</span
+              >
               <div class="icon-box">
                 <el-icon class="icon" color="#fff" @click.stop="handleClearSession(index)">
                   <Brush />
@@ -121,8 +211,7 @@ const handleRequest = async () => {
               <el-option label="DeepSeek" value="deepseek-chat" />
               <el-option label="Gemini" value="gemini-chat" />
             </el-select>
-            <el-button style="height: 40px" type="primary"
-            @click="handleRequest">
+            <el-button style="height: 40px" type="primary" @click="handleRequest">
               <el-icon>
                 <Promotion />
               </el-icon>
@@ -199,7 +288,11 @@ const handleRequest = async () => {
   border: 8px;
   height: calc(94vh - 40px - 32px);
 }
-
+.add-btn {
+  width: 100%;
+  font-size: 15px;
+  font-weight: bold;
+}
 .session-area {
   margin-top: 16px;
   height: calc(100% - 32px);
@@ -235,7 +328,10 @@ const handleRequest = async () => {
 .session-item:hover .icon-box {
   opacity: 1;
 }
-
+.session-item-active {
+  background: rgba(254, 44, 85, 0.2);
+  border: 1px solid rgba(254, 44, 85, 0.3);
+}
 .icon-box {
   opacity: 0;
 }
