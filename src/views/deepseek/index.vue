@@ -7,7 +7,7 @@ import { API_CONFIG as DeepSeek_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/con
 // 用户输入的提示词
 const queryKeys = ref('')
 
-//
+// 请求信息
 const queryInfos = ref({
   messages: [],
   model: "deepseek-chat",
@@ -52,7 +52,6 @@ const handleRequest = async () => {
 
       for await (const part of response) {
         queryInfos.value.messages[queryInfos.value.messages.length - 1].content += part.choices[0].delta.content;
-        console.log(part.choices[0].delta.content)
       }
     }
   } catch(error) {
@@ -105,7 +104,7 @@ const handleRequest = async () => {
         </div>
         <div class="container">
           <div class="message-area">
-            <MessageComp />
+            <MessageComp :messages="queryInfos.messages" />
           </div>
           <div class="user-tokens">
             <span>当前余额为：￥0</span>
