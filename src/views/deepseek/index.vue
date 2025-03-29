@@ -3,7 +3,8 @@ import { Promotion, Delete, EditPen, Brush, Plus } from '@element-plus/icons-vue
 import MessageComp from './components/messageComp.vue'
 import { ref, onMounted, nextTick, watch } from 'vue'
 import OpenAI from 'openai'
-import { API_CONFIG as DeepSeek_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/config/deepseek'
+import { API_CONFIG as DEEPSEEK_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/config/deepseek'
+import { getTokens } from '@/apis/modules/deepseek'
 // 用户输入的提示词
 const queryKeys = ref('')
 
@@ -18,7 +19,7 @@ const queryInfos = ref({
 const openai = ref(null)
 
 // 当前的模型配置
-const currentConfig = ref(DeepSeek_CONFIG)
+const currentConfig = ref(DEEPSEEK_CONFIG)
 
 // 对话组件实例
 const messageRef = ref(null)
@@ -28,6 +29,9 @@ const sessionList = ref([])
 
 // 当前活跃的对话索引
 const activeIndex = ref(-1)
+
+// 当前余额
+const totalAmt = ref(0)
 
 // 监听对话列表的变化
 watch(
@@ -80,6 +84,20 @@ const initIndex = () => {
   if (activeIndex.value !== -1) {
     queryInfos.value.messages = sessionList.value[activeIndex.value].messages || []
   }
+}
+
+// 初始化Token
+const initToken = async () => {
+  const res = await getTokens({
+    deepseek: 'Y',
+    gptToken: DEEPSEEK_CONFIG.apiKey,
+  })
+  console.log('initToke执行了')
+  console.log('得到数据', res)
+  const { balance_infos = [] } = res
+  balance_infos.forEach((item) => {
+    totalAmt.value += Number(item.total_balance)
+  })
 }
 
 // 新增对话
@@ -147,6 +165,7 @@ onMounted(async () => {
   initSessionList()
   initIndex()
   initOpenAI()
+  initToken()
   await nextTick()
   messageRef.value.scrollBottom()
 })
@@ -203,7 +222,7 @@ onMounted(async () => {
             <MessageComp :messages="queryInfos.messages" ref="messageRef" />
           </div>
           <div class="user-tokens">
-            <span>当前余额为：￥0</span>
+            <span>当前余额为：￥{{ totalAmt }}</span>
           </div>
           <div class="input-area">
             <el-input placeholder="请输入内容" show-word-limit v-model="queryKeys" />
