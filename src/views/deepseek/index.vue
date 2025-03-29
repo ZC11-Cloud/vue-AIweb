@@ -1,5 +1,6 @@
 <script setup>
 import { Promotion, Delete, EditPen, Brush, Plus } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import MessageComp from './components/messageComp.vue'
 import { ref, onMounted, nextTick, watch } from 'vue'
 import OpenAI from 'openai'
@@ -111,6 +112,38 @@ const handleAddSession = () => {
   activeIndex.value = sessionList.value.length - 1
 }
 
+// 清空对话
+const handleClearSession = (index) => {
+  sessionList.value[index].messages = []
+  queryInfos.value.messages = sessionList.value[index].messages
+  activeIndex.value = index
+}
+
+// 删除对话
+const handleDeleteSession = (index = 0) => {
+  console.log('删除对话', index + 1)
+  ElMessage.warning('删除对话')
+  ElMessageBox.confirm('确定删除当前对话？', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      console.log('删除对话', index + 1)
+      sessionList.value.splice(index, 1)
+      if (index == activeIndex.value) {
+        activeIndex.value = sessionList.value[index] ? index : --index
+      } else if (index < activeIndex.value) {
+        activeIndex.value = --activeIndex.value
+      }
+      queryInfos.value.messages = activeIndex.value > -1 ? sessionList.value[activeIndex.value] : []
+      handleChangeSessionIndex(activeIndex.value)
+    })
+    .catch(() => {
+      console.log('取消删除对话')
+    })
+}
+
 // 改变活跃对话
 const handleChangeSessionIndex = async (index) => {
   activeIndex.value = index
@@ -174,7 +207,7 @@ onMounted(async () => {
   <div class="inner-html-container">
     <div class="page">
       <div class="tips">
-        <div class="title">deepseek</div>
+        <div class="title">{{ queryInfos.model }}</div>
         <div class="desc">
           本网站采用本地缓存模式运行，不会留存任何涉及您个人的信息数据，请放心使用。
         </div>
@@ -222,7 +255,10 @@ onMounted(async () => {
             <MessageComp :messages="queryInfos.messages" ref="messageRef" />
           </div>
           <div class="user-tokens">
-            <span>当前余额为：￥{{ totalAmt }}</span>
+            <span v-if="queryInfos.model == 'deepseek-chat'"
+              >当前余额为：￥{{ totalAmt || 0 }}</span
+            >
+            <span v-else>免费</span>
           </div>
           <div class="input-area">
             <el-input placeholder="请输入内容" show-word-limit v-model="queryKeys" />
