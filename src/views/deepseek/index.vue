@@ -34,6 +34,9 @@ const activeIndex = ref(-1)
 // 当前余额
 const totalAmt = ref(0)
 
+// 编辑当前对话索引
+const editIndex = ref(-1)
+
 // 监听对话列表的变化
 watch(
   sessionList,
@@ -122,7 +125,6 @@ const handleClearSession = (index) => {
 // 删除对话
 const handleDeleteSession = (index = 0) => {
   console.log('删除对话', index + 1)
-  ElMessage.warning('删除对话')
   ElMessageBox.confirm('确定删除当前对话？', '警告', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -142,6 +144,11 @@ const handleDeleteSession = (index = 0) => {
     .catch(() => {
       console.log('取消删除对话')
     })
+}
+
+// 编辑对话
+const handleFocusInput = (index) => {
+  editIndex.value = index
 }
 
 // 改变活跃对话
@@ -234,8 +241,19 @@ onMounted(async () => {
               <span
                 class="normal-node"
                 :class="activeIndex == index ? 'active-node' : 'normal-node'"
-                >{{ item.title }}</span
+                v-if="editIndex != index">{{ item.title }}</span
               >
+              <el-input
+                :ref="`renameRef_${index}`"
+                autofocus
+                v-model="item.title"
+                v-else
+                size="small"
+                style="width: 120px"
+                @blur="editIndex = -1"
+                @change="editIndex = -1"
+              >
+              </el-input>
               <div class="icon-box">
                 <el-icon class="icon" color="#fff" @click.stop="handleClearSession(index)">
                   <Brush />
