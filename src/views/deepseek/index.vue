@@ -37,6 +37,9 @@ const totalAmt = ref(0)
 // 编辑当前对话索引
 const editIndex = ref(-1)
 
+// 加载状态
+const loading = ref(false)
+
 // 监听对话列表的变化
 watch(
   sessionList,
@@ -106,6 +109,10 @@ const initToken = async () => {
 
 // 新增对话
 const handleAddSession = () => {
+  if (loading.value) {
+    ElMessage({ type: 'warning', message: '请当前问题查询完成后重试！' })
+    return
+  }
   sessionList.value.push({
     title: `对话${sessionList.value.length + 1}`,
     crtTime: new Date(),
@@ -153,6 +160,10 @@ const handleFocusInput = (index) => {
 
 // 改变活跃对话
 const handleChangeSessionIndex = async (index) => {
+  if (loading.value) {
+    ElMessage({ type: 'warning', message: '请当前问题查询完成后重试！' })
+    return
+  }
   activeIndex.value = index
   queryInfos.value.messages = sessionList.value[index]?.messages || []
   await nextTick()
@@ -161,7 +172,6 @@ const handleChangeSessionIndex = async (index) => {
 
 // 处理用户请求
 const handleRequest = async () => {
-  console.log('用户正在发起请求')
   if (!queryKeys.value) return // 输入为空时，不执行
   if (!openai.value) initOpenAI() // 初始化openai
   if (!sessionList.value.length) {
@@ -177,6 +187,7 @@ const handleRequest = async () => {
   messageRef.value.scrollBottom()
 
   try {
+    loading.value = true
     queryInfos.value.messages.push({
       role: 'assistant',
       content: '',
@@ -196,7 +207,9 @@ const handleRequest = async () => {
 
       messageRef.value.scrollBottom()
     }
+    loading.value = false
   } catch (error) {
+    loading.value = false
     queryInfos.value.messages[queryInfos.value.messages.length - 1].content = error.message
   }
 }
@@ -241,7 +254,8 @@ onMounted(async () => {
               <span
                 class="normal-node"
                 :class="activeIndex == index ? 'active-node' : 'normal-node'"
-                v-if="editIndex != index">{{ item.title }}</span
+                v-if="editIndex != index"
+                >{{ item.title }}</span
               >
               <el-input
                 :ref="`renameRef_${index}`"
@@ -279,12 +293,28 @@ onMounted(async () => {
             <span v-else>免费</span>
           </div>
           <div class="input-area">
-            <el-input placeholder="请输入内容" show-word-limit v-model="queryKeys" />
+            <el-input
+              placeholder="请输入内容"
+              show-word-limit
+              v-model="queryKeys"
+              @keydown.enter="
+                (e) => {
+                  if (e.isComposing || loading) return
+                  handleRequest()
+                }
+              "
+            />
             <el-select class="model-select">
               <el-option label="DeepSeek" value="deepseek-chat" />
               <el-option label="Gemini" value="gemini-chat" />
             </el-select>
-            <el-button style="height: 40px" type="primary" @click="handleRequest">
+            <el-button
+              style="height: 40px"
+              type="primary"
+              @click="handleRequest"
+              :disabled="!queryKeys"
+              :loading="loading"
+            >
               <el-icon>
                 <Promotion />
               </el-icon>
