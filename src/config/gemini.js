@@ -1,5 +1,5 @@
 // gemini2.0配置文件
-const API_KEY = '' // 换成自己的apiiKey
+const API_KEY = process.env.GIMINI_API_KEY // 换成自己的apiiKey
 export const API_CONFIG = {
   baseURL: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
   apiKey: API_KEY,
