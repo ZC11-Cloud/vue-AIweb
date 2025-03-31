@@ -7,6 +7,11 @@ import OpenAI from 'openai'
 import { API_CONFIG as DEEPSEEK_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/config/deepseek'
 import { API_CONFIG as GEMINI_CONFIG, MODEL_CONFIG as GEMINI_MODEL_CONFIG } from '@/config/gemini'
 import { getTokens } from '@/apis/modules/deepseek'
+import MobileDetect from 'mobile-detect'
+
+// 检测是否是移动端
+const isMobile = ref(false)
+
 // 用户输入的提示词
 const queryKeys = ref('')
 
@@ -58,7 +63,6 @@ watch(
 watch(
   activeIndex,
   (val) => {
-    console.log('活跃索引变化', val, STORAGE_KEYS.activeIndex)
     localStorage.setItem(STORAGE_KEYS.activeIndex, JSON.stringify(val))
   },
   { deep: true },
@@ -100,8 +104,6 @@ const initToken = async () => {
     deepseek: 'Y',
     gptToken: DEEPSEEK_CONFIG.apiKey,
   })
-  console.log('initToke执行了')
-  console.log('得到数据', res)
   const { balance_infos = [] } = res
   balance_infos.forEach((item) => {
     totalAmt.value += Number(item.total_balance)
@@ -132,14 +134,12 @@ const handleClearSession = (index) => {
 
 // 删除对话
 const handleDeleteSession = (index = 0) => {
-  console.log('删除对话', index + 1)
   ElMessageBox.confirm('确定删除当前对话？', '警告', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning',
   })
     .then(() => {
-      console.log('删除对话', index + 1)
       sessionList.value.splice(index, 1)
       if (index == activeIndex.value) {
         activeIndex.value = sessionList.value[index] ? index : --index
@@ -149,9 +149,7 @@ const handleDeleteSession = (index = 0) => {
       queryInfos.value.messages = activeIndex.value > -1 ? sessionList.value[activeIndex.value] : []
       handleChangeSessionIndex(activeIndex.value)
     })
-    .catch(() => {
-      console.log('取消删除对话')
-    })
+    .catch(() => {})
 }
 
 // 编辑对话
@@ -269,6 +267,10 @@ onMounted(async () => {
   initIndex()
   initOpenAI()
   initToken()
+
+  // 判断是否为移动端
+  const md = new MobileDetect(window.navigator.userAgent)
+  isMobile.value = md.mobile()
   await nextTick()
   messageRef.value.scrollBottom()
 })
@@ -278,12 +280,12 @@ onMounted(async () => {
     <div class="page">
       <div class="tips">
         <div class="title">{{ queryInfos.model }}</div>
-        <div class="desc">
+        <div class="desc" v-if="!isMobile">
           本网站采用本地缓存模式运行，不会留存任何涉及您个人的信息数据，请放心使用。
         </div>
       </div>
-      <div class="grid-space-between grid-box">
-        <div class="left-container">
+      <div class="grid-space-between" :class="!isMobile ? 'grid-box' : ''">
+        <div class="left-container" v-if="!isMobile">
           <el-button
             type="primary"
             class="add-btn"
@@ -336,13 +338,13 @@ onMounted(async () => {
           <div class="message-area">
             <MessageComp :messages="queryInfos.messages" ref="messageRef" />
           </div>
-          <div class="user-tokens">
+          <div class="user-tokens" :class="isMobile ? 'left-space' : ''">
             <span v-if="queryInfos.model == 'deepseek-chat'"
               >当前余额为：￥{{ totalAmt || 0 }}</span
             >
             <span v-else>免费</span>
           </div>
-          <div class="input-area">
+          <div class="input-area" :class="isMobile ? 'left-space' : ''">
             <el-input
               placeholder="请输入内容"
               show-word-limit
@@ -441,6 +443,7 @@ onMounted(async () => {
   border: 8px;
   height: calc(94vh - 40px - 32px);
 }
+
 .add-btn {
   width: 100%;
   font-size: 15px;
@@ -518,5 +521,9 @@ onMounted(async () => {
   grid-gap: 10px;
   box-sizing: border-box;
   padding: 0 8px 8px 0;
+}
+
+.el-select__wrapper {
+  height: 40px;
 }
 </style>
