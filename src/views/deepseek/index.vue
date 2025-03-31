@@ -5,6 +5,7 @@ import MessageComp from './components/messageComp.vue'
 import { ref, onMounted, nextTick, watch } from 'vue'
 import OpenAI from 'openai'
 import { API_CONFIG as DEEPSEEK_CONFIG, MODEL_CONFIG, STORAGE_KEYS } from '@/config/deepseek'
+import { API_CONFIG as GEMINI_CONFIG, MODEL_CONFIG as GEMINI_MODEL_CONFIG } from '@/config/gemini'
 import { getTokens } from '@/apis/modules/deepseek'
 // 用户输入的提示词
 const queryKeys = ref('')
@@ -206,12 +207,61 @@ const handleRequest = async () => {
       }
 
       messageRef.value.scrollBottom()
+    } else if (queryInfos.value.model === 'gemini-chat') {
+      const contents = queryInfos.value.messages.slice(0, -1).map((msg) => ({
+        parts: [{ text: msg.content }],
+        role: msg.role === 'user' ? 'user' : 'model',
+      }))
+
+      const response = await fetch(currentConfig.value.baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...GEMINI_MODEL_CONFIG,
+          contents,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Http error! status: ${response.status}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, {
+          stream: true,
+        })
+        const data = JSON.parse(chunk)
+
+        if (data?.candidates?.[0]?.content?.parts?.[0].text) {
+          queryInfos.value.messages[queryInfos.value.messages.length - 1].content +=
+            data.candidates[0].content.parts[0].text
+          messageRef.value.scrollBottom()
+        }
+      }
+
+      if (!queryInfos.value.messages[queryInfos.value.messages.length - 1].content) {
+        throw new Error('未收到有效的 Gemini API 响应')
+      }
     }
     loading.value = false
   } catch (error) {
     loading.value = false
     queryInfos.value.messages[queryInfos.value.messages.length - 1].content = error.message
   }
+}
+
+// 切换模型
+const handleModelChange = (model) => {
+  currentConfig.value = model === 'deepseek-chat' ? DEEPSEEK_CONFIG : GEMINI_CONFIG
+  initOpenAI()
 }
 
 onMounted(async () => {
@@ -304,7 +354,7 @@ onMounted(async () => {
                 }
               "
             />
-            <el-select class="model-select">
+            <el-select class="model-select" v-model="queryInfos.model" @change="handleModelChange">
               <el-option label="DeepSeek" value="deepseek-chat" />
               <el-option label="Gemini" value="gemini-chat" />
             </el-select>

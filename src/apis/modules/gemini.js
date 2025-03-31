@@ -1,0 +1,13 @@
+import request from "@/apis/request"
+import { API_CONFIG } from "@/config/gemini"
+export function generateContent(param) {
+  return request({
+    url: API_CONFIG.baseURL,
+    method: "post",
+    data: {
+      contents: [{
+        parts: [{text: param.prompt}]
+      }]
+    }
+  })
+}
